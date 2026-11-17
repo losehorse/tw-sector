@@ -44,34 +44,34 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#faf7ee}tbody tr.sel{backgroun
 <body>
 <main>
 
-<section class="card" id="c1">
-  <div class="eyebrow"><span>01 · 設定</span><span id="asof"></span></div>
-  <h1>台股產業族群觀測面板</h1>
-  <div class="ctl">
-    <span class="mut">比較區間</span>
-    <div class="seg" id="presets"></div>
-    <select id="basesel" title="自訂基準日"></select>
-  </div>
-  <div class="note" id="rangeNote"></div>
-</section>
+<header class="card" id="c1" style="padding:14px 18px">
+  <div class="eyebrow"><span>台股產業族群觀測</span><span id="asof"></span></div>
+  <h1 style="margin:4px 0 0">台股產業族群觀測面板</h1>
+</header>
 
 <section class="card" id="c2">
-  <div class="eyebrow"><span>02 · 每日勝負</span><span id="d2"></span></div>
+  <div class="eyebrow"><span>01 · 每日勝負</span><span id="d2"></span></div>
   <h2>近 10 個交易日：哪些族群單日跑贏大盤</h2>
   <div class="scroll"><table class="heat" id="heat"></table></div>
-  <p class="note">紅＝當日族群等權平均報酬 &gt; 加權指數，綠＝低於。依今日超額報酬排序。</p>
+  <p class="note">紅＝當日族群等權平均報酬 &gt; 加權指數，綠＝低於。依今日超額報酬排序。固定看最近 10 個交易日，不受比較區間影響。</p>
 </section>
 
 <section class="card" id="c2b">
-  <div class="eyebrow"><span>02B · 週線 RS</span><span id="d2b"></span></div>
+  <div class="eyebrow"><span>02 · 週線 RS</span><span id="d2b"></span></div>
   <h2>週線 RS 4 週變化（%）</h2>
   <div class="scroll"><table class="heat" id="rs"></table></div>
-  <p class="note">RS = 族群等權指數 ÷ 全市場等權指數；每格＝該週最後交易日的 RS 相對 4 週前的變動百分比。紅＝相對全市場轉強，綠＝轉弱，依最新一週排序。全市場為面板收錄之上市櫃普通股（不含 ETF）。</p>
+  <p class="note">RS = 族群等權指數 ÷ 全市場等權指數；每格＝該週最後交易日的 RS 相對 4 週前的變動百分比。紅＝相對全市場轉強，綠＝轉弱，依最新一週排序，不受比較區間影響。全市場為面板收錄之上市櫃普通股（不含 ETF）。</p>
 </section>
 
 <section class="card" id="c3">
   <div class="eyebrow"><span>03 · 族群比較</span><span id="d3"></span></div>
   <h2>族群平均與台灣加權指數</h2>
+  <div class="ctl">
+    <span class="mut">比較區間</span>
+    <div class="seg" id="presets"></div>
+    <select id="basesel" title="自訂基準日"></select>
+  </div>
+  <div class="note" id="rangeNote" style="margin:0 0 12px"></div>
   <div class="stat" id="stat"></div>
   <div class="ctl">
     <span class="mut">搜尋族群</span><input type="search" id="q" placeholder="例如 半導體">
@@ -93,6 +93,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#faf7ee}tbody tr.sel{backgroun
   <div class="chartwrap"><div id="ch4"></div><div class="tip" id="tip4"></div></div>
   <div class="chips" id="chips4" style="margin-top:12px"></div>
   <p class="note" id="n4"></p>
+  <p class="note" style="margin-top:4px">成分股的累計漲跌幅沿用第 03 區的比較區間。</p>
   <div class="scroll" style="margin-top:10px"><table id="stab"></table></div>
 </section>
 
