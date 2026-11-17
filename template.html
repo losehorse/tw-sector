@@ -33,7 +33,12 @@ th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white
 th:first-child,td:first-child{text-align:left}
 th{color:var(--sub);font-weight:500;font-size:12px;background:#fff}
 th[data-k]{cursor:pointer;user-select:none}th[data-k]:hover{color:var(--ink)}
-tbody tr{cursor:pointer}tbody tr:hover{background:#faf7ee}tbody tr.sel{background:var(--chip)}
+tbody tr{cursor:pointer}
+.sugwrap{position:relative;margin-bottom:10px}.sugwrap input{width:100%}
+.sug{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:6;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.12);max-height:280px;overflow:auto;display:none}
+.sug div{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line)}.sug div:last-child{border:0}.sug div:hover,.sug div.act{background:#faf7ee}
+.focusbox{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 12px;line-height:1.9;background:#fffdf7}
+tr.focus{background:#fff3d6}tbody tr:hover{background:#faf7ee}tbody tr.sel{background:var(--chip)}
 .scroll{overflow-x:auto;overflow-y:visible;border:1px solid var(--line);border-radius:12px}
 .heat td:first-child,.heat th:first-child{position:sticky;left:0;background:#fff;z-index:2;box-shadow:1px 0 0 var(--line)}
 .heat td{padding:4px 3px;text-align:center}.heat td:first-child{text-align:left}
@@ -87,7 +92,9 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#faf7ee}tbody tr.sel{backgroun
 
 <section class="card" id="c4">
   <div class="eyebrow"><span>04 · 族群成分股</span><span id="d4"></span></div>
+  <div class="sugwrap"><input type="search" id="q4" placeholder="搜尋公司（名稱或代號），例如 台積電、2330" autocomplete="off"><div class="sug" id="sug4"></div></div>
   <h2 id="t4">—</h2>
+  <div class="focusbox" id="focus4" style="display:none"></div>
   <div class="chips" id="chips4a"></div>
   <div class="chartwrap"><div id="ch4"></div><div class="tip" id="tip4"></div></div>
   <div class="chips" id="chips4" style="margin-top:12px"></div>
@@ -137,7 +144,7 @@ function groupStats(g) {
 
 /* ---- chart ---- */
 function lineChart(host, tipEl, series, t0) {
-  const W = 860, H = 560, ml = 70, mr = 170, mt = 34, mb = 44, iw = W - ml - mr, ih = H - mt - mb;
+  const W = 860, H = 560, ml = 92, mr = 170, mt = 34, mb = 44, iw = W - ml - mr, ih = H - mt - mb;
   const nT = L - t0 + 1;
   let lo = 0, hi = 0;
   for (const s of series) for (let k = 0; k < nT; k++) { const v = s.vals[k]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
@@ -291,20 +298,37 @@ function renderStocks() {
   }).sort((a, b) => (b.exCum ?? -9) - (a.exCum ?? -9));
   const ok = rows.filter(r => r.cum != null);
   if (!state.hidden.size && !state.hiddenInit) { rows.forEach((r, i) => { if (i >= 8 || r.cum == null) state.hidden.add(r.c); }); state.hiddenInit = true; }
+  if (state.focus) state.hidden.delete(state.focus);
   const win = ok.filter(r => r.exCum > 0).length;
   $('chips4a').innerHTML = `<span class="chip"><i style="background:${BROWN}"></i>台灣加權 <b class="${cls(txRet(t0, L))}">${pct(txRet(t0, L))}</b></span><span class="chip"><i style="background:#2e7d4f"></i>族群平均 <b class="${cls(avgRet(m, t0, L).v)}">${pct(avgRet(m, t0, L).v)}</b></span>`;
   const col = {}; rows.forEach((r, i) => col[r.c] = PAL[i % PAL.length]);
   const ss = [{ name: '台灣加權', color: BROWN, w: 5, vals: txSeries(t0) }, { name: '族群平均', color: '#2e7d4f', w: 4, dash: true, vals: series(m, t0) }];
-  for (const r of rows) if (!state.hidden.has(r.c) && r.cum != null) ss.push({ name: `${r.name} ${r.c}`, label: r.name, color: col[r.c], w: 2, vals: series([r.c], t0) });
+  for (const r of rows) if (!state.hidden.has(r.c) && r.cum != null) ss.push({ name: `${r.name} ${r.c}`, label: r.name, color: r.c === state.focus ? '#e67e00' : col[r.c], w: r.c === state.focus ? 5 : 2, vals: series([r.c], t0) });
   lineChart($('ch4'), $('tip4'), ss, t0);
-  $('chips4').innerHTML = rows.map(r => `<span class="chip ${state.hidden.has(r.c) ? 'off' : ''}" data-c="${r.c}"><i style="background:${col[r.c]}"></i>${esc(r.name)} ${r.c}</span>`).join('') + `<span class="chip" id="allbtn" style="background:#fff">${state.hidden.size ? '顯示全部' : '隱藏全部'}</span>`;
+  $('chips4').innerHTML = rows.map(r => `<span class="chip ${state.hidden.has(r.c) ? 'off' : ''}" data-c="${r.c}"><i style="background:${r.c === state.focus ? '#e67e00' : col[r.c]}"></i>${esc(r.name)} ${r.c}</span>`).join('') + `<span class="chip" id="allbtn" style="background:#fff">${state.hidden.size ? '顯示全部' : '隱藏全部'}</span>`;
   $('chips4').querySelectorAll('.chip[data-c]').forEach(ch => ch.onclick = () => { const c = ch.dataset.c; state.hidden.has(c) ? state.hidden.delete(c) : state.hidden.add(c); renderStocks(); });
   $('allbtn').onclick = () => { if (state.hidden.size) state.hidden.clear(); else rows.forEach(r => state.hidden.add(r.c)); renderStocks(); };
   $('n4').textContent = `已顯示 ${rows.filter(r => !state.hidden.has(r.c) && r.cum != null).length} / 可比較 ${ok.length} 檔，成分股共 ${m.length} 檔；跑贏大盤 ${win} 檔。點選個股圖例可顯示或隱藏折線。`;
+  const fbox = $('focus4');
+  const fr = rows.find(r => r.c === state.focus);
+  if (fr) {
+    const gc = avgRet(m, t0, L).v, tc0 = txRet(t0, L);
+    const tag = ex => ex == null ? '—' : ex > 0 ? '<b class="up">強於大盤</b>' : '<b class="down">弱於大盤</b>';
+    const gex = gc == null || tc0 == null ? null : gc - tc0;
+    const others = G.filter(x => D.groups[x].includes(fr.c) && x !== g);
+    fbox.style.display = '';
+    fbox.innerHTML = `<div><b>${esc(fr.name)} ${fr.c}</b> <span class="mut">收盤 ${fr.px ?? '—'}</span> <span class="chip" id="clrfocus" style="padding:2px 8px">清除 ×</span></div>` +
+      `<div>個股 ${tag(fr.exCum)} <span class="${cls(fr.cum)}">${pct(fr.cum)}</span>，超額 <span class="${cls(fr.exCum)}">${pct(fr.exCum)}</span>（大盤 ${pct(tc0)}）</div>` +
+      `<div>所屬族群「${esc(g)}」${tag(gex)} <span class="${cls(gc)}">${pct(gc)}</span>，超額 <span class="${cls(gex)}">${pct(gex)}</span></div>` +
+      (others.length ? `<div class="mut">也屬於：${others.map(x => `<span class="chip" data-og="${esc(x)}" style="padding:2px 8px">${esc(x)}</span>`).join(' ')}</div>` : '');
+    $('clrfocus').onclick = () => { state.focus = null; renderStocks(); };
+    fbox.querySelectorAll('[data-og]').forEach(ch => ch.onclick = () => { state.gsel = null; pickGroup(ch.dataset.og, false); });
+  } else { fbox.style.display = 'none'; }
   const sst = SORT.s;
   const srows = sortBy(rows, r => sst.k === 'name' ? r.name : r[sst.k], sst);
   $('stab').innerHTML = `<thead><tr>${TH(sst, 'name', '個股')}${TH(sst, 'px', '收盤')}${TH(sst, 'cum', '累計')}${TH(sst, 'exCum', '累計超額')}${TH(sst, 'ex5', '近5日超額')}${TH(sst, 'exDay', '今日超額')}</tr></thead><tbody>` +
-    srows.map(r => `<tr><td>${esc(r.name)} <span class="mut">${r.c}</span></td><td>${r.px ?? '—'}</td><td class="${cls(r.cum)}">${pct(r.cum)}</td><td class="${cls(r.exCum)}"><b>${pct(r.exCum)}</b></td><td class="${cls(r.ex5)}">${pct(r.ex5)}</td><td class="${cls(r.exDay)}">${pct(r.exDay)}</td></tr>`).join('') + '</tbody>';
+    srows.map(r => `<tr data-c="${r.c}" class="${r.c === state.focus ? 'focus' : ''}"><td>${esc(r.name)} <span class="mut">${r.c}</span></td><td>${r.px ?? '—'}</td><td class="${cls(r.cum)}">${pct(r.cum)}</td><td class="${cls(r.exCum)}"><b>${pct(r.exCum)}</b></td><td class="${cls(r.ex5)}">${pct(r.ex5)}</td><td class="${cls(r.exDay)}">${pct(r.exDay)}</td></tr>`).join('') + '</tbody>';
+  $('stab').querySelectorAll('tbody tr[data-c]').forEach(tr => tr.onclick = () => { state.focus = state.focus === tr.dataset.c ? null : tr.dataset.c; renderStocks(); });
   bindSort($('stab'), sst, renderStocks);
 }
 
@@ -331,6 +355,7 @@ function renderRS() {
 }
 
 function pickGroup(g, scroll) {
+  if (state.focus && !D.groups[g].includes(state.focus)) state.focus = null;
   if (!state.sel.includes(g)) state.sel.push(g);
   if (state.gsel !== g) { state.gsel = g; state.hidden = new Set(); state.hiddenInit = false; }
   renderAll();
@@ -345,6 +370,36 @@ function renderAll() {
   }
   renderTable(); renderChart3(); renderStocks();
 }
+
+/* ---- company search (04) ---- */
+const SIDX = Object.entries(D.stocks).map(([c, v]) => ({ c, n: v.n }));
+let sugList = [], sugAct = 0;
+function showSug() {
+  const q = $('q4').value.trim().toLowerCase(), box = $('sug4');
+  if (!q) { box.style.display = 'none'; return; }
+  sugList = SIDX.filter(x => x.c.startsWith(q) || x.n.toLowerCase().includes(q)).sort((a, b) => (a.c.startsWith(q) ? 0 : 1) - (b.c.startsWith(q) ? 0 : 1) || a.c.localeCompare(b.c)).slice(0, 8);
+  sugAct = 0;
+  box.innerHTML = sugList.length ? sugList.map((x, i) => `<div data-c="${x.c}" class="${i ? '' : 'act'}">${esc(x.n)} <span class="mut">${x.c} · ${esc(G.filter(g => D.groups[g].includes(x.c)).slice(0, 2).join('、'))}</span></div>`).join('') : '<div class="mut">找不到符合的公司</div>';
+  box.style.display = 'block';
+  box.querySelectorAll('div[data-c]').forEach(d => d.onmousedown = e => { e.preventDefault(); chooseStock(d.dataset.c); });
+}
+function chooseStock(c) {
+  const gs = G.filter(g => D.groups[g].includes(c));
+  if (!gs.length) return;
+  state.focus = c;
+  const g = gs.includes(state.gsel) ? state.gsel : gs.sort((a, b) => D.groups[a].length - D.groups[b].length)[0];  // most specific group first
+  $('q4').value = ''; $('sug4').style.display = 'none'; $('q4').blur();
+  state.gsel = null; state.hiddenInit = false;
+  pickGroup(g, true);
+}
+$('q4').addEventListener('input', showSug);
+$('q4').addEventListener('focus', showSug);
+$('q4').addEventListener('blur', () => setTimeout(() => $('sug4').style.display = 'none', 150));
+$('q4').addEventListener('keydown', e => {
+  const items = [...$('sug4').querySelectorAll('div[data-c]')]; if (!items.length) return;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { sugAct = (sugAct + (e.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length; items.forEach((d, i) => d.classList.toggle('act', i === sugAct)); e.preventDefault(); }
+  else if (e.key === 'Enter') { chooseStock(items[sugAct].dataset.c); e.preventDefault(); }
+});
 $('q').addEventListener('input', e => { state.q = e.target.value; renderTable(); });
 renderAll();
 </script>
