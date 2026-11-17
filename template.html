@@ -38,7 +38,8 @@ tbody tr{cursor:pointer}
 .sug{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:6;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.12);max-height:280px;overflow:auto;display:none}
 .sug div{padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--line)}.sug div:last-child{border:0}.sug div:hover,.sug div.act{background:#faf7ee}
 .focusbox{border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin:0 0 12px;line-height:1.9;background:#fffdf7}
-tr.focus{background:#fff3d6}tbody tr:hover{background:#faf7ee}tbody tr.sel{background:var(--chip)}
+tr.focus{background:#fff3d6}
+tbody tr.txrow,tbody tr.txrow:hover{background:#f2ead0;cursor:default}tr.txrow td{font-weight:600;border-top:1px solid #e2d6ad;border-bottom:1px solid #e2d6ad}.txrow .base{color:var(--sub);font-weight:400}tbody tr:hover{background:#faf7ee}tbody tr.sel{background:var(--chip)}
 .scroll{overflow-x:auto;overflow-y:visible;border:1px solid var(--line);border-radius:12px}
 .heat td:first-child,.heat th:first-child{position:sticky;left:0;background:#fff;z-index:2;box-shadow:1px 0 0 var(--line)}
 .heat td{padding:4px 3px;text-align:center}.heat td:first-child{text-align:left}
@@ -263,9 +264,10 @@ function renderStat() {
 
 function renderTable() {
   const st = SORT.g, q = state.q.trim();
-  const rows = sortBy(stats.filter(s => s.ok && (!q || s.g.includes(q))), r => st.k === 'name' ? r.g : r[st.k], st);
+  const txRow = { tx: true, g: '台灣加權指數', n: null, cum: txRet(state.bi, L), exCum: 0, ex5: 0, exDay: 0 };
+  const rows = sortBy([...stats.filter(s => s.ok && (!q || s.g.includes(q))), txRow], r => st.k === 'name' ? r.g : r[st.k], st);
   $('gtab').innerHTML = `<thead><tr>${TH(st, 'name', '族群')}${TH(st, 'n', '家數')}${TH(st, 'cum', '累計')}${TH(st, 'exCum', '累計超額')}${TH(st, 'ex5', '近5日超額')}${TH(st, 'exDay', '今日超額')}</tr></thead><tbody>` +
-    (rows.length ? rows.map(s => `<tr data-g="${esc(s.g)}" class="${s.g === state.gsel ? 'sel' : ''}"><td>${state.sel.includes(s.g) ? `<i class="dot" style="width:9px;height:9px;border-radius:50%;background:${gColor(s.g)}"></i> ` : ''}${esc(s.g)}</td><td>${s.n}</td><td class="${cls(s.cum)}">${pct(s.cum)}</td><td class="${cls(s.exCum)}"><b>${pct(s.exCum)}</b></td><td class="${cls(s.ex5)}">${pct(s.ex5)}</td><td class="${cls(s.exDay)}">${pct(s.exDay)}</td></tr>`).join('') : `<tr><td colspan="6" class="empty">沒有符合的族群</td></tr>`) + '</tbody>';
+    (rows.length ? rows.map(s => s.tx ? `<tr class="txrow"><td>${s.g}</td><td class="base">—</td><td class="${cls(s.cum)}">${pct(s.cum)}</td><td class="base">基準</td><td class="base">基準</td><td class="base">基準</td></tr>` : `<tr data-g="${esc(s.g)}" class="${s.g === state.gsel ? 'sel' : ''}"><td>${state.sel.includes(s.g) ? `<i class="dot" style="width:9px;height:9px;border-radius:50%;background:${gColor(s.g)}"></i> ` : ''}${esc(s.g)}</td><td>${s.n}</td><td class="${cls(s.cum)}">${pct(s.cum)}</td><td class="${cls(s.exCum)}"><b>${pct(s.exCum)}</b></td><td class="${cls(s.ex5)}">${pct(s.ex5)}</td><td class="${cls(s.exDay)}">${pct(s.exDay)}</td></tr>`).join('') : `<tr><td colspan="6" class="empty">沒有符合的族群</td></tr>`) + '</tbody>';
   $('gtab').querySelectorAll('tbody tr[data-g]').forEach(tr => tr.onclick = () => pickGroup(tr.dataset.g, true));
   bindSort($('gtab'), st, renderTable);
 }
@@ -325,9 +327,10 @@ function renderStocks() {
     fbox.querySelectorAll('[data-og]').forEach(ch => ch.onclick = () => { state.gsel = null; pickGroup(ch.dataset.og, false); });
   } else { fbox.style.display = 'none'; }
   const sst = SORT.s;
-  const srows = sortBy(rows, r => sst.k === 'name' ? r.name : r[sst.k], sst);
+  const txRow4 = { tx: true, c: '', name: '台灣加權指數', px: TX[L], cum: txRet(t0, L), exCum: 0, ex5: 0, exDay: 0 };
+  const srows = sortBy([...rows, txRow4], r => sst.k === 'name' ? r.name : r[sst.k], sst);
   $('stab').innerHTML = `<thead><tr>${TH(sst, 'name', '個股')}${TH(sst, 'px', '收盤')}${TH(sst, 'cum', '累計')}${TH(sst, 'exCum', '累計超額')}${TH(sst, 'ex5', '近5日超額')}${TH(sst, 'exDay', '今日超額')}</tr></thead><tbody>` +
-    srows.map(r => `<tr data-c="${r.c}" class="${r.c === state.focus ? 'focus' : ''}"><td>${esc(r.name)} <span class="mut">${r.c}</span></td><td>${r.px ?? '—'}</td><td class="${cls(r.cum)}">${pct(r.cum)}</td><td class="${cls(r.exCum)}"><b>${pct(r.exCum)}</b></td><td class="${cls(r.ex5)}">${pct(r.ex5)}</td><td class="${cls(r.exDay)}">${pct(r.exDay)}</td></tr>`).join('') + '</tbody>';
+    srows.map(r => r.tx ? `<tr class="txrow"><td>${r.name}</td><td>${r.px.toLocaleString()}</td><td class="${cls(r.cum)}">${pct(r.cum)}</td><td class="base">基準</td><td class="base">基準</td><td class="base">基準</td></tr>` : `<tr data-c="${r.c}" class="${r.c === state.focus ? 'focus' : ''}"><td>${esc(r.name)} <span class="mut">${r.c}</span></td><td>${r.px ?? '—'}</td><td class="${cls(r.cum)}">${pct(r.cum)}</td><td class="${cls(r.exCum)}"><b>${pct(r.exCum)}</b></td><td class="${cls(r.ex5)}">${pct(r.ex5)}</td><td class="${cls(r.exDay)}">${pct(r.exDay)}</td></tr>`).join('') + '</tbody>';
   $('stab').querySelectorAll('tbody tr[data-c]').forEach(tr => tr.onclick = () => { state.focus = state.focus === tr.dataset.c ? null : tr.dataset.c; renderStocks(); });
   bindSort($('stab'), sst, renderStocks);
 }
