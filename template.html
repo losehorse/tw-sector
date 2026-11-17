@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>台股產業族群觀測面板</title>
+<style>
+:root{--bg:#f4f3f0;--card:#fff;--line:#e3e1db;--chip:#f6efdc;--ink:#1d1d1f;--sub:#76736b;--up:#c0392b;--down:#1e7f4f;--tx:#8a6a24}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;-webkit-text-size-adjust:100%}
+main{max-width:760px;margin:0 auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin:0 0 14px}
+.eyebrow{display:flex;justify-content:space-between;color:var(--sub);font-size:12px;letter-spacing:.08em}
+h1{font-size:20px;margin:6px 0 12px}h2{font-size:20px;margin:6px 0 12px}
+.stat{border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px;line-height:1.9}
+.stat b{font-size:17px}.stat span.k{margin-right:14px;white-space:nowrap}
+.up{color:var(--up)}.down{color:var(--down)}.mut{color:var(--sub);font-size:12px}
+.ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:#fff;padding:6px 11px;font:inherit;font-size:13px;color:var(--sub);cursor:pointer}
+.seg button.on{background:var(--chip);color:var(--ink);font-weight:600}
+select,input[type=search]{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:#fff}
+input[type=search]{flex:1;min-width:140px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 10px}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip);border:1px solid var(--line);border-radius:10px;padding:5px 10px;font-size:13px;cursor:pointer;user-select:none}
+.chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.chip.off{opacity:.4}.chip .x{color:var(--sub);margin-left:2px}
+.chartwrap{position:relative;border:2px solid #cfe3f7;border-radius:6px}
+svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:10px;padding:6px 9px;font-size:12px;box-shadow:0 2px 10px rgba(0,0,0,.12);display:none;white-space:nowrap;z-index:3}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+th{color:var(--sub);font-weight:500;font-size:12px;position:sticky;top:0;background:#fff}
+tbody tr{cursor:pointer}tbody tr:hover{background:#faf7ee}tbody tr.sel{background:var(--chip)}
+.scroll{max-height:420px;overflow:auto;border:1px solid var(--line);border-radius:12px}
+.heat td:first-child,.heat th:first-child{position:sticky;left:0;background:#fff;z-index:2;box-shadow:1px 0 0 var(--line)}
+.heat td{padding:4px 3px;text-align:center}.heat td:first-child{text-align:left}
+.dot{display:inline-block;width:14px;height:14px;border-radius:4px}
+.note{color:var(--sub);font-size:12.5px;margin:10px 0 0}
+.empty{padding:26px;text-align:center;color:var(--sub)}
+</style>
+</head>
+<body>
+<main>
+
+<section class="card" id="c1">
+  <div class="eyebrow"><span>01 · 設定</span><span id="asof"></span></div>
+  <h1>台股產業族群觀測面板</h1>
+  <div class="ctl">
+    <span class="mut">比較區間</span>
+    <div class="seg" id="presets"></div>
+    <select id="basesel" title="自訂基準日"></select>
+  </div>
+  <div class="note" id="rangeNote"></div>
+</section>
+
+<section class="card" id="c2">
+  <div class="eyebrow"><span>02 · 每日勝負</span><span id="d2"></span></div>
+  <h2>近 10 個交易日：哪些族群單日跑贏大盤</h2>
+  <div class="scroll"><table class="heat" id="heat"></table></div>
+  <p class="note">紅＝當日族群等權平均報酬 &gt; 加權指數，綠＝低於。依今日超額報酬排序。</p>
+</section>
+
+<section class="card" id="c2b">
+  <div class="eyebrow"><span>02B · 週線 RS</span><span id="d2b"></span></div>
+  <h2>週線 RS 4 週變化（%）</h2>
+  <div class="scroll"><table class="heat" id="rs"></table></div>
+  <p class="note">RS = 族群等權指數 ÷ 全市場等權指數；每格＝該週最後交易日的 RS 相對 4 週前的變動百分比。紅＝相對全市場轉強，綠＝轉弱，依最新一週排序。全市場為面板收錄之上市櫃普通股（不含 ETF）。</p>
+</section>
+
+<section class="card" id="c3">
+  <div class="eyebrow"><span>03 · 族群比較</span><span id="d3"></span></div>
+  <h2>族群平均與台灣加權指數</h2>
+  <div class="stat" id="stat"></div>
+  <div class="ctl">
+    <span class="mut">搜尋族群</span><input type="search" id="q" placeholder="例如 半導體">
+  </div>
+  <div class="chips" id="chips3"></div>
+  <div class="chartwrap"><div id="ch3"></div><div class="tip" id="tip3"></div></div>
+  <p class="note">點選下方表格的族群會加入折線，並切換第 04 區的成分股。共同基準日見上方；採未還原收盤價，基準日為 0%。族群以當日可比較的成分股做等權平均。</p>
+
+  <div class="ctl" style="margin-top:14px"><span class="mut">排序</span>
+    <div class="seg" id="sortseg"></div>
+  </div>
+  <div class="scroll"><table id="gtab"></table></div>
+</section>
+
+<section class="card" id="c4">
+  <div class="eyebrow"><span>04 · 族群成分股</span><span id="d4"></span></div>
+  <h2 id="t4">—</h2>
+  <div class="chips" id="chips4a"></div>
+  <div class="chartwrap"><div id="ch4"></div><div class="tip" id="tip4"></div></div>
+  <div class="chips" id="chips4" style="margin-top:12px"></div>
+  <p class="note" id="n4"></p>
+  <div class="scroll" style="margin-top:10px"><table id="stab"></table></div>
+</section>
+
+<p class="note" style="text-align:center">資料來源：證交所、櫃買中心（每日收盤行情）、FinMind（產業分類）。僅供研究，非投資建議。</p>
+</main>
+
+<script>
+const D = /*__DATA__*/null;
+const dates = D.dates, N = dates.length, L = N - 1, TX = D.taiex;
+const PAL = ['#3b5b8c','#2e7d4f','#8a6bbd','#c0652d','#2f8f9d','#b24a7f','#7d8c2a','#a8374b','#4a6fa5','#5f9ea0','#c28a1e','#6b5b95'];
+const BROWN = '#8a6a24';
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = (v, d = 2) => v == null ? '—' : (v >= 0 ? '+' : '') + (v * 100).toFixed(d) + '%';
+const cls = v => v == null ? '' : v > 0 ? 'up' : v < 0 ? 'down' : '';
+const md = i => dates[i].slice(5).replace('-', '/');
+const G = Object.keys(D.groups);
+
+const state = { bi: Math.max(0, L - 20), sel: [], gsel: null, hidden: new Set(), sort: 'cum', q: '' };
+
+/* ---- math ---- */
+// equal-weight mean of returns c[t1]/c[t0]-1 across members that have both closes
+function avgRet(codes, t0, t1) {
+  let s = 0, n = 0;
+  for (const c of codes) {
+    const a = D.stocks[c].c[t0], b = D.stocks[c].c[t1];
+    if (a != null && b != null) { s += b / a - 1; n++; }
+  }
+  return { v: n ? s / n : null, n };
+}
+const txRet = (t0, t1) => TX[t0] && TX[t1] ? TX[t1] / TX[t0] - 1 : null;
+const MIN_N = 3;
+
+function groupStats(g) {
+  const m = D.groups[g];
+  const cum = avgRet(m, state.bi, L), day = avgRet(m, Math.max(0, L - 1), L), w5 = avgRet(m, Math.max(0, L - 5), L);
+  const tc = txRet(state.bi, L), td = txRet(L - 1, L), t5 = txRet(Math.max(0, L - 5), L);
+  const ex = (a, t) => a.v == null || a.n < MIN_N || t == null ? null : a.v - t;
+  return { g, n: cum.n, total: m.length, cum: cum.v, day: day.v, w5: w5.v,
+           exCum: ex(cum, tc), exDay: ex(day, td), ex5: ex(w5, t5), ok: cum.n >= MIN_N };
+}
+
+/* ---- chart ---- */
+function lineChart(host, tipEl, series, t0) {
+  const W = 860, H = 560, ml = 70, mr = 170, mt = 34, mb = 44, iw = W - ml - mr, ih = H - mt - mb;
+  const nT = L - t0 + 1;
+  let lo = 0, hi = 0;
+  for (const s of series) for (let k = 0; k < nT; k++) { const v = s.vals[k]; if (v != null) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+  if (hi === lo) { hi += .01; lo -= .01; }
+  const pad = (hi - lo) * .06; lo -= pad; hi += pad;
+  const X = k => ml + (nT === 1 ? 0 : k / (nT - 1)) * iw, Y = v => mt + (1 - (v - lo) / (hi - lo)) * ih;
+  let o = `<svg viewBox="0 0 ${W} ${H}" font-family="-apple-system,PingFang TC,Noto Sans TC,sans-serif">`;
+  o += `<text x="${ml}" y="22" font-size="26" font-weight="700">累計漲跌幅 (%)</text>`;
+  for (let i = 0; i < 5; i++) {
+    const v = lo + (hi - lo) * i / 4, y = Y(v);
+    o += `<line x1="${ml}" x2="${ml + iw}" y1="${y}" y2="${y}" stroke="#e6e4de"/><text x="${ml - 8}" y="${y + 7}" font-size="21" text-anchor="end" fill="#555">${(v * 100).toFixed(1)}%</text>`;
+  }
+  for (let i = 0; i < 5; i++) {
+    const k = Math.round((nT - 1) * i / 4), x = X(k);
+    o += `<line x1="${x}" x2="${x}" y1="${mt}" y2="${mt + ih}" stroke="#eeece7"/><text x="${x}" y="${H - 14}" font-size="21" text-anchor="middle" fill="#555">${md(t0 + k)}</text>`;
+  }
+  if (lo < 0 && hi > 0) o += `<line x1="${ml}" x2="${ml + iw}" y1="${Y(0)}" y2="${Y(0)}" stroke="#999" stroke-width="1.5"/>`;
+  o += `<line x1="${X(nT - 1)}" x2="${X(nT - 1)}" y1="${mt}" y2="${mt + ih}" stroke="#555" stroke-dasharray="4 4"/>`;
+  const ends = [];
+  for (const s of series) {
+    let d = '', pen = false;
+    for (let k = 0; k < nT; k++) { const v = s.vals[k]; if (v == null) { pen = false; continue; } d += (pen ? 'L' : 'M') + X(k).toFixed(1) + ' ' + Y(v).toFixed(1); pen = true; }
+    o += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.w || 3}" ${s.dash ? 'stroke-dasharray="10 6"' : ''} stroke-linejoin="round" stroke-linecap="round"/>`;
+    let kl = nT - 1; while (kl > 0 && s.vals[kl] == null) kl--;
+    if (s.vals[kl] != null) ends.push({ s, y: Y(s.vals[kl]), x: X(kl) });
+  }
+  ends.sort((a, b) => a.y - b.y);
+  let prev = -1e9; for (const e of ends) { e.ly = Math.max(e.y, prev + 26); prev = e.ly; }
+  for (let i = ends.length - 1, nxt = 1e9; i >= 0; i--) { if (ends[i].ly > mt + ih + 14) ends[i].ly = mt + ih + 14; if (ends[i].ly > nxt - 26) ends[i].ly = nxt - 26; nxt = ends[i].ly; }
+  for (const e of ends) {
+    o += `<circle cx="${e.x}" cy="${e.y}" r="5" fill="${e.s.color}"/><line x1="${e.x + 6}" y1="${e.y}" x2="${ml + iw + 14}" y2="${e.ly}" stroke="${e.s.color}" stroke-opacity=".5"/>` +
+         `<text x="${ml + iw + 18}" y="${e.ly + 7}" font-size="22" font-weight="700" fill="${e.s.color}">${esc(e.s.label || e.s.name)}</text>`;
+  }
+  o += `<line id="cur" x1="0" x2="0" y1="${mt}" y2="${mt + ih}" stroke="#333" stroke-opacity=".5" style="display:none"/>`;
+  o += `<rect id="hit" x="${ml}" y="${mt}" width="${iw}" height="${ih}" fill="transparent"/></svg>`;
+  host.innerHTML = o;
+  const svg = host.querySelector('svg'), hit = svg.querySelector('#hit'), cur = svg.querySelector('#cur');
+  const move = ev => {
+    const r = svg.getBoundingClientRect(), px = (ev.clientX - r.left) / r.width * W;
+    const k = Math.max(0, Math.min(nT - 1, Math.round((px - ml) / iw * (nT - 1))));
+    cur.setAttribute('x1', X(k)); cur.setAttribute('x2', X(k)); cur.style.display = '';
+    const rows = series.filter(s => s.vals[k] != null).sort((a, b) => b.vals[k] - a.vals[k]);
+    tipEl.innerHTML = `<b>${dates[t0 + k]}</b>` + rows.map(s => `<div><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${s.color}"></i> ${esc(s.name)} <span class="${cls(s.vals[k])}">${pct(s.vals[k])}</span></div>`).join('');
+    tipEl.style.display = 'block';
+    const left = X(k) / W * r.width; tipEl.style.left = Math.min(left + 10, r.width - tipEl.offsetWidth - 4) + 'px'; tipEl.style.top = '40px';
+  };
+  hit.addEventListener('pointermove', move); hit.addEventListener('pointerdown', move);
+  hit.addEventListener('pointerleave', () => { tipEl.style.display = 'none'; cur.style.display = 'none'; });
+}
+const series = (codes, t0) => Array.from({ length: L - t0 + 1 }, (_, k) => avgRet(codes, t0, t0 + k).v);
+const txSeries = t0 => Array.from({ length: L - t0 + 1 }, (_, k) => txRet(t0, t0 + k));
+const gColor = g => PAL[Math.max(0, state.sel.indexOf(g)) % PAL.length];
+
+/* ---- renderers ---- */
+function renderHeader() {
+  $('asof').textContent = dates[L];
+  ['d2', 'd3', 'd4'].forEach(i => $(i).textContent = dates[L]);
+  const presets = [['5日', 5], ['20日', 20], ['60日', 60], ['全部', N - 1]];
+  $('presets').innerHTML = presets.map(([t, k]) => `<button data-k="${k}" class="${state.bi === Math.max(0, L - k) ? 'on' : ''}">${t}</button>`).join('');
+  $('presets').querySelectorAll('button').forEach(b => b.onclick = () => { state.bi = Math.max(0, L - +b.dataset.k); renderAll(); });
+  $('basesel').innerHTML = dates.slice(0, L).map((d, i) => `<option value="${i}" ${i === state.bi ? 'selected' : ''}>基準日 ${d}</option>`).join('');
+  $('basesel').onchange = e => { state.bi = +e.target.value; renderAll(); };
+  $('rangeNote').textContent = `資料範圍 ${dates[0]} 至 ${dates[L]}（${N} 個交易日）· 目前基準日 ${dates[state.bi]}（距今 ${L - state.bi} 個交易日）`;
+}
+
+function renderHeat() {
+  const days = []; for (let t = Math.max(1, L - 9); t <= L; t++) days.push(t);
+  const rows = G.map(g => {
+    const cells = days.map(t => { const r = avgRet(D.groups[g], t - 1, t), x = txRet(t - 1, t); return r.n < MIN_N || x == null ? null : r.v - x; });
+    return { g, cells };
+  }).filter(r => r.cells[r.cells.length - 1] != null).sort((a, b) => b.cells[b.cells.length - 1] - a.cells[a.cells.length - 1]);
+  $('heat').innerHTML = `<thead><tr><th>族群</th>${days.map(t => `<th style="text-align:center">${md(t)}</th>`).join('')}<th>今日超額</th></tr></thead><tbody>` +
+    rows.map(r => `<tr data-g="${esc(r.g)}"><td>${esc(r.g)}</td>${r.cells.map(v => `<td><span class="dot" title="${pct(v)}" style="background:${v == null ? '#eee' : v > 0 ? 'var(--up)' : 'var(--down)'};opacity:${v == null ? 1 : Math.min(1, .35 + Math.abs(v) * 25)}"></span></td>`).join('')}<td class="${cls(r.cells.at(-1))}">${pct(r.cells.at(-1))}</td></tr>`).join('') + '</tbody>';
+  $('heat').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => pickGroup(tr.dataset.g, true));
+}
+
+let stats = [];
+function renderStat() {
+  stats = G.map(groupStats);
+  const ok = stats.filter(s => s.ok && s.exCum != null), win = ok.filter(s => s.exCum > 0), lose = ok.filter(s => s.exCum < 0);
+  const ratio = ok.length ? win.length / ok.length : null;
+  // same base, 5 trading days earlier
+  let prevRatio = null;
+  if (L - 5 > state.bi) {
+    const t = L - 5; let w = 0, c = 0;
+    for (const g of G) { const r = avgRet(D.groups[g], state.bi, t), x = txRet(state.bi, t); if (r.n >= MIN_N && x != null) { c++; if (r.v > x) w++; } }
+    prevRatio = c ? w / c : null;
+  }
+  const diff = ratio != null && prevRatio != null ? ratio - prevRatio : null;
+  $('stat').innerHTML = `<span class="k">優於大盤 <b class="up">${win.length} 群</b></span><span class="k">弱於大盤 <b class="down">${lose.length} 群</b></span><span class="k">優於大盤比例 <b>${ratio == null ? '—' : (ratio * 100).toFixed(0) + '%'}</b></span><br>` +
+    `<span class="k">較前 5 個交易日 <b class="${cls(diff)}">${diff == null ? '—' : (diff >= 0 ? '+' : '') + (diff * 100).toFixed(1) + ' pp'}</b></span><br>` +
+    `<span class="mut">${dates[L]} · ${ok.length} 群可比較 · 成分股不足 ${MIN_N} 檔者略過 ${stats.length - ok.length} 群 · 大盤 ${pct(txRet(state.bi, L))}</span>`;
+}
+
+function renderTable() {
+  const key = { cum: 'exCum', day: 'exDay', w5: 'ex5' }[state.sort];
+  $('sortseg').innerHTML = [['cum', '累計超額'], ['w5', '近5日超額'], ['day', '今日超額']].map(([k, t]) => `<button data-k="${k}" class="${state.sort === k ? 'on' : ''}">${t}</button>`).join('');
+  $('sortseg').querySelectorAll('button').forEach(b => b.onclick = () => { state.sort = b.dataset.k; renderTable(); });
+  const q = state.q.trim();
+  const rows = stats.filter(s => s.ok && (!q || s.g.includes(q))).sort((a, b) => (b[key] ?? -9) - (a[key] ?? -9));
+  $('gtab').innerHTML = `<thead><tr><th>族群</th><th>家數</th><th>累計</th><th>累計超額</th><th>近5日超額</th><th>今日超額</th></tr></thead><tbody>` +
+    (rows.length ? rows.map(s => `<tr data-g="${esc(s.g)}" class="${s.g === state.gsel ? 'sel' : ''}"><td>${state.sel.includes(s.g) ? `<i class="dot" style="width:9px;height:9px;border-radius:50%;background:${gColor(s.g)}"></i> ` : ''}${esc(s.g)}</td><td>${s.n}</td><td class="${cls(s.cum)}">${pct(s.cum)}</td><td class="${cls(s.exCum)}"><b>${pct(s.exCum)}</b></td><td class="${cls(s.ex5)}">${pct(s.ex5)}</td><td class="${cls(s.exDay)}">${pct(s.exDay)}</td></tr>`).join('') : `<tr><td colspan="6" class="empty">沒有符合的族群</td></tr>`) + '</tbody>';
+  $('gtab').querySelectorAll('tbody tr[data-g]').forEach(tr => tr.onclick = () => pickGroup(tr.dataset.g, true));
+}
+
+function renderChart3() {
+  const t0 = state.bi, tx = txSeries(t0);
+  const ss = [{ name: '台灣加權', color: BROWN, w: 5, vals: tx }];
+  const chips = [`<span class="chip"><i style="background:${BROWN}"></i>台灣加權 <b class="${cls(tx.at(-1))}">${pct(tx.at(-1))}</b></span>`];
+  for (const g of state.sel) {
+    const v = series(D.groups[g], t0), c = gColor(g);
+    ss.push({ name: g, color: c, vals: v, w: 3 });
+    chips.push(`<span class="chip" data-g="${esc(g)}"><i style="background:${c}"></i>${esc(g)} <b class="${cls(v.at(-1))}">${pct(v.at(-1))}</b><span class="x" data-x="${esc(g)}">×</span></span>`);
+  }
+  $('chips3').innerHTML = chips.join('');
+  $('chips3').querySelectorAll('.chip[data-g]').forEach(ch => ch.onclick = e => {
+    if (e.target.dataset.x) { state.sel = state.sel.filter(x => x !== e.target.dataset.x); if (state.gsel === e.target.dataset.x) state.gsel = state.sel[0] || state.gsel; renderAll(); }
+    else pickGroup(ch.dataset.g, false);
+  });
+  lineChart($('ch3'), $('tip3'), ss, t0);
+}
+
+function renderStocks() {
+  const g = state.gsel; if (!g) return;
+  const m = D.groups[g], t0 = state.bi;
+  $('t4').textContent = g;
+  const rows = m.map(c => {
+    const s = D.stocks[c], cum = avgRet([c], t0, L).v, day = avgRet([c], L - 1, L).v, w5 = avgRet([c], Math.max(0, L - 5), L).v;
+    const tc = txRet(t0, L), td = txRet(L - 1, L), t5 = txRet(Math.max(0, L - 5), L);
+    return { c, name: s.n, px: s.c[L], cum, day, w5, exCum: cum == null ? null : cum - tc, exDay: day == null ? null : day - td, ex5: w5 == null ? null : w5 - t5 };
+  }).sort((a, b) => (b.exCum ?? -9) - (a.exCum ?? -9));
+  const ok = rows.filter(r => r.cum != null);
+  if (!state.hidden.size && !state.hiddenInit) { rows.forEach((r, i) => { if (i >= 8 || r.cum == null) state.hidden.add(r.c); }); state.hiddenInit = true; }
+  const win = ok.filter(r => r.exCum > 0).length;
+  $('chips4a').innerHTML = `<span class="chip"><i style="background:${BROWN}"></i>台灣加權 <b class="${cls(txRet(t0, L))}">${pct(txRet(t0, L))}</b></span><span class="chip"><i style="background:#2e7d4f"></i>族群平均 <b class="${cls(avgRet(m, t0, L).v)}">${pct(avgRet(m, t0, L).v)}</b></span>`;
+  const col = {}; rows.forEach((r, i) => col[r.c] = PAL[i % PAL.length]);
+  const ss = [{ name: '台灣加權', color: BROWN, w: 5, vals: txSeries(t0) }, { name: '族群平均', color: '#2e7d4f', w: 4, dash: true, vals: series(m, t0) }];
+  for (const r of rows) if (!state.hidden.has(r.c) && r.cum != null) ss.push({ name: `${r.name} ${r.c}`, label: r.name, color: col[r.c], w: 2, vals: series([r.c], t0) });
+  lineChart($('ch4'), $('tip4'), ss, t0);
+  $('chips4').innerHTML = rows.map(r => `<span class="chip ${state.hidden.has(r.c) ? 'off' : ''}" data-c="${r.c}"><i style="background:${col[r.c]}"></i>${esc(r.name)} ${r.c}</span>`).join('') + `<span class="chip" id="allbtn" style="background:#fff">${state.hidden.size ? '顯示全部' : '隱藏全部'}</span>`;
+  $('chips4').querySelectorAll('.chip[data-c]').forEach(ch => ch.onclick = () => { const c = ch.dataset.c; state.hidden.has(c) ? state.hidden.delete(c) : state.hidden.add(c); renderStocks(); });
+  $('allbtn').onclick = () => { if (state.hidden.size) state.hidden.clear(); else rows.forEach(r => state.hidden.add(r.c)); renderStocks(); };
+  $('n4').textContent = `已顯示 ${rows.filter(r => !state.hidden.has(r.c) && r.cum != null).length} / 可比較 ${ok.length} 檔，成分股共 ${m.length} 檔；跑贏大盤 ${win} 檔。點選個股圖例可顯示或隱藏折線。`;
+  $('stab').innerHTML = `<thead><tr><th>個股</th><th>收盤</th><th>累計</th><th>累計超額</th><th>近5日超額</th><th>今日超額</th></tr></thead><tbody>` +
+    rows.map(r => `<tr><td>${esc(r.name)} <span class="mut">${r.c}</span></td><td>${r.px ?? '—'}</td><td class="${cls(r.cum)}">${pct(r.cum)}</td><td class="${cls(r.exCum)}"><b>${pct(r.exCum)}</b></td><td class="${cls(r.ex5)}">${pct(r.ex5)}</td><td class="${cls(r.exDay)}">${pct(r.exDay)}</td></tr>`).join('') + '</tbody>';
+}
+
+
+/* ---- weekly RS ---- */
+function eqIndex(codes) { const o = [1]; for (let t = 1; t < N; t++) o.push(o[t - 1] * (1 + (avgRet(codes, t - 1, t).v ?? 0))); return o; }
+function weekKey(d) { const x = new Date(d + 'T00:00:00Z'); x.setUTCDate(x.getUTCDate() - (x.getUTCDay() + 6) % 7); return x.toISOString().slice(0, 10); }
+function renderRS() {
+  const WE = []; for (let t = 0; t < N; t++) if (t === L || weekKey(dates[t + 1]) !== weekKey(dates[t])) WE.push(t);
+  $('d2b').textContent = dates[L];
+  if (WE.length < 5) { $('rs').innerHTML = '<tr><td class="empty">資料不足 5 週</td></tr>'; return; }
+  const M = eqIndex(Object.keys(D.stocks)), cols = WE.slice(4).slice(-12);
+  const rows = G.filter(g => D.groups[g].length >= MIN_N).map(g => {
+    const I = eqIndex(D.groups[g]); const rs = t => I[t] / M[t];
+    return { g, n: D.groups[g].length, cells: cols.map(t => { const k = WE.indexOf(t); return rs(t) / rs(WE[k - 4]) - 1; }) };
+  }).sort((a, b) => b.cells.at(-1) - a.cells.at(-1));
+  const bg = v => { const a = Math.min(1, Math.abs(v) / 0.3); return v >= 0 ? `rgba(192,57,43,${.12 + a * .88})` : `rgba(30,127,79,${.12 + a * .88})`; };
+  $('rs').innerHTML = `<thead><tr><th>族群</th>${cols.map(t => `<th style="text-align:center">${md(t)}</th>`).join('')}</tr></thead><tbody>` +
+    rows.map(r => `<tr data-g="${esc(r.g)}"><td>${esc(r.g)} <span class="mut">(${r.n})</span></td>${r.cells.map(v => `<td style="text-align:center;background:${bg(v)};color:${Math.abs(v) > .18 ? '#fff' : 'inherit'}">${(v * 100).toFixed(0)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  $('rs').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => pickGroup(tr.dataset.g, true));
+}
+
+function pickGroup(g, scroll) {
+  if (!state.sel.includes(g)) state.sel.push(g);
+  if (state.gsel !== g) { state.gsel = g; state.hidden = new Set(); state.hiddenInit = false; }
+  renderAll();
+  if (scroll) $('c4').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderAll() {
+  renderHeader(); renderHeat(); renderRS(); document.querySelectorAll('#c2 .scroll,#c2b .scroll').forEach(e => e.scrollLeft = e.scrollWidth); renderStat();
+  if (!state.sel.length) {
+    const top = stats.filter(s => s.ok && s.exCum != null).sort((a, b) => b.exCum - a.exCum).slice(0, 3).map(s => s.g);
+    state.sel = top; state.gsel = state.gsel || top[0];
+  }
+  renderTable(); renderChart3(); renderStocks();
+}
+$('q').addEventListener('input', e => { state.q = e.target.value; renderTable(); });
+renderAll();
+</script>
+</body>
+</html>
