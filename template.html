@@ -32,6 +32,7 @@ table{width:100%;border-collapse:collapse;font-size:13.5px}
 th,td{padding:7px 6px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
 th{color:var(--sub);font-weight:500;font-size:12px;background:#fff}
+th[data-k]{cursor:pointer;user-select:none}th[data-k]:hover{color:var(--ink)}
 tbody tr{cursor:pointer}tbody tr:hover{background:#faf7ee}tbody tr.sel{background:var(--chip)}
 .scroll{overflow-x:auto;overflow-y:visible;border:1px solid var(--line);border-radius:12px}
 .heat td:first-child,.heat th:first-child{position:sticky;left:0;background:#fff;z-index:2;box-shadow:1px 0 0 var(--line)}
@@ -80,9 +81,7 @@ tbody tr{cursor:pointer}tbody tr:hover{background:#faf7ee}tbody tr.sel{backgroun
   <div class="chartwrap"><div id="ch3"></div><div class="tip" id="tip3"></div></div>
   <p class="note">點選下方表格的族群會加入折線，並切換第 04 區的成分股。共同基準日見上方；採未還原收盤價，基準日為 0%。族群以當日可比較的成分股做等權平均。</p>
 
-  <div class="ctl" style="margin-top:14px"><span class="mut">排序</span>
-    <div class="seg" id="sortseg"></div>
-  </div>
+  <p class="note" style="margin:14px 0 6px">點表格欄位標題可排序，再點一次反向。</p>
   <div class="scroll"><table id="gtab"></table></div>
 </section>
 
@@ -192,6 +191,25 @@ const series = (codes, t0) => Array.from({ length: L - t0 + 1 }, (_, k) => avgRe
 const txSeries = t0 => Array.from({ length: L - t0 + 1 }, (_, k) => txRet(t0, t0 + k));
 const gColor = g => PAL[Math.max(0, state.sel.indexOf(g)) % PAL.length];
 
+/* ---- sorting helpers ---- */
+const SORT = { heat: { k: 'last', d: -1 }, rs: { k: 'last', d: -1 }, g: { k: 'exCum', d: -1 }, s: { k: 'exCum', d: -1 } };
+function sortBy(rows, get, st) {
+  return rows.slice().sort((a, b) => {
+    const x = get(a), y = get(b);
+    if (x == null && y == null) return 0; if (x == null) return 1; if (y == null) return -1;
+    return (typeof x === 'string' ? x.localeCompare(y, 'zh-Hant') : x - y) * st.d;
+  });
+}
+const arrow = (st, k) => String(st.k) === String(k) ? (st.d < 0 ? ' ▼' : ' ▲') : '';
+const TH = (st, k, label, style = '') => `<th data-k="${k}" style="${style}">${label}${arrow(st, k)}</th>`;
+function bindSort(tbl, st, fn) {
+  tbl.querySelectorAll('thead th[data-k]').forEach(th => th.onclick = () => {
+    const k = th.dataset.k;
+    if (String(st.k) === k) st.d = -st.d; else { st.k = k; st.d = k === 'name' ? 1 : -1; }
+    fn();
+  });
+}
+
 /* ---- renderers ---- */
 function renderHeader() {
   $('asof').textContent = dates[L];
@@ -206,13 +224,16 @@ function renderHeader() {
 
 function renderHeat() {
   const days = []; for (let t = Math.max(1, L - 9); t <= L; t++) days.push(t);
-  const rows = G.map(g => {
+  const st = SORT.heat;
+  let rows = G.map(g => {
     const cells = days.map(t => { const r = avgRet(D.groups[g], t - 1, t), x = txRet(t - 1, t); return r.n < MIN_N || x == null ? null : r.v - x; });
     return { g, cells };
-  }).filter(r => r.cells[r.cells.length - 1] != null).sort((a, b) => b.cells[b.cells.length - 1] - a.cells[a.cells.length - 1]);
-  $('heat').innerHTML = `<thead><tr><th>族群</th>${days.map(t => `<th style="text-align:center">${md(t)}</th>`).join('')}<th>今日超額</th></tr></thead><tbody>` +
+  }).filter(r => r.cells[r.cells.length - 1] != null);
+  rows = sortBy(rows, r => st.k === 'name' ? r.g : st.k === 'last' ? r.cells.at(-1) : r.cells[+st.k], st);
+  $('heat').innerHTML = `<thead><tr>${TH(st, 'name', '族群')}${days.map((t, i) => TH(st, i, md(t), 'text-align:center')).join('')}${TH(st, 'last', '今日超額')}</tr></thead><tbody>` +
     rows.map(r => `<tr data-g="${esc(r.g)}"><td>${esc(r.g)}</td>${r.cells.map(v => `<td><span class="dot" title="${pct(v)}" style="background:${v == null ? '#eee' : v > 0 ? 'var(--up)' : 'var(--down)'};opacity:${v == null ? 1 : Math.min(1, .35 + Math.abs(v) * 25)}"></span></td>`).join('')}<td class="${cls(r.cells.at(-1))}">${pct(r.cells.at(-1))}</td></tr>`).join('') + '</tbody>';
   $('heat').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => pickGroup(tr.dataset.g, true));
+  bindSort($('heat'), st, renderHeat);
 }
 
 let stats = [];
@@ -234,14 +255,12 @@ function renderStat() {
 }
 
 function renderTable() {
-  const key = { cum: 'exCum', day: 'exDay', w5: 'ex5' }[state.sort];
-  $('sortseg').innerHTML = [['cum', '累計超額'], ['w5', '近5日超額'], ['day', '今日超額']].map(([k, t]) => `<button data-k="${k}" class="${state.sort === k ? 'on' : ''}">${t}</button>`).join('');
-  $('sortseg').querySelectorAll('button').forEach(b => b.onclick = () => { state.sort = b.dataset.k; renderTable(); });
-  const q = state.q.trim();
-  const rows = stats.filter(s => s.ok && (!q || s.g.includes(q))).sort((a, b) => (b[key] ?? -9) - (a[key] ?? -9));
-  $('gtab').innerHTML = `<thead><tr><th>族群</th><th>家數</th><th>累計</th><th>累計超額</th><th>近5日超額</th><th>今日超額</th></tr></thead><tbody>` +
+  const st = SORT.g, q = state.q.trim();
+  const rows = sortBy(stats.filter(s => s.ok && (!q || s.g.includes(q))), r => st.k === 'name' ? r.g : r[st.k], st);
+  $('gtab').innerHTML = `<thead><tr>${TH(st, 'name', '族群')}${TH(st, 'n', '家數')}${TH(st, 'cum', '累計')}${TH(st, 'exCum', '累計超額')}${TH(st, 'ex5', '近5日超額')}${TH(st, 'exDay', '今日超額')}</tr></thead><tbody>` +
     (rows.length ? rows.map(s => `<tr data-g="${esc(s.g)}" class="${s.g === state.gsel ? 'sel' : ''}"><td>${state.sel.includes(s.g) ? `<i class="dot" style="width:9px;height:9px;border-radius:50%;background:${gColor(s.g)}"></i> ` : ''}${esc(s.g)}</td><td>${s.n}</td><td class="${cls(s.cum)}">${pct(s.cum)}</td><td class="${cls(s.exCum)}"><b>${pct(s.exCum)}</b></td><td class="${cls(s.ex5)}">${pct(s.ex5)}</td><td class="${cls(s.exDay)}">${pct(s.exDay)}</td></tr>`).join('') : `<tr><td colspan="6" class="empty">沒有符合的族群</td></tr>`) + '</tbody>';
   $('gtab').querySelectorAll('tbody tr[data-g]').forEach(tr => tr.onclick = () => pickGroup(tr.dataset.g, true));
+  bindSort($('gtab'), st, renderTable);
 }
 
 function renderChart3() {
@@ -282,8 +301,11 @@ function renderStocks() {
   $('chips4').querySelectorAll('.chip[data-c]').forEach(ch => ch.onclick = () => { const c = ch.dataset.c; state.hidden.has(c) ? state.hidden.delete(c) : state.hidden.add(c); renderStocks(); });
   $('allbtn').onclick = () => { if (state.hidden.size) state.hidden.clear(); else rows.forEach(r => state.hidden.add(r.c)); renderStocks(); };
   $('n4').textContent = `已顯示 ${rows.filter(r => !state.hidden.has(r.c) && r.cum != null).length} / 可比較 ${ok.length} 檔，成分股共 ${m.length} 檔；跑贏大盤 ${win} 檔。點選個股圖例可顯示或隱藏折線。`;
-  $('stab').innerHTML = `<thead><tr><th>個股</th><th>收盤</th><th>累計</th><th>累計超額</th><th>近5日超額</th><th>今日超額</th></tr></thead><tbody>` +
-    rows.map(r => `<tr><td>${esc(r.name)} <span class="mut">${r.c}</span></td><td>${r.px ?? '—'}</td><td class="${cls(r.cum)}">${pct(r.cum)}</td><td class="${cls(r.exCum)}"><b>${pct(r.exCum)}</b></td><td class="${cls(r.ex5)}">${pct(r.ex5)}</td><td class="${cls(r.exDay)}">${pct(r.exDay)}</td></tr>`).join('') + '</tbody>';
+  const sst = SORT.s;
+  const srows = sortBy(rows, r => sst.k === 'name' ? r.name : r[sst.k], sst);
+  $('stab').innerHTML = `<thead><tr>${TH(sst, 'name', '個股')}${TH(sst, 'px', '收盤')}${TH(sst, 'cum', '累計')}${TH(sst, 'exCum', '累計超額')}${TH(sst, 'ex5', '近5日超額')}${TH(sst, 'exDay', '今日超額')}</tr></thead><tbody>` +
+    srows.map(r => `<tr><td>${esc(r.name)} <span class="mut">${r.c}</span></td><td>${r.px ?? '—'}</td><td class="${cls(r.cum)}">${pct(r.cum)}</td><td class="${cls(r.exCum)}"><b>${pct(r.exCum)}</b></td><td class="${cls(r.ex5)}">${pct(r.ex5)}</td><td class="${cls(r.exDay)}">${pct(r.exDay)}</td></tr>`).join('') + '</tbody>';
+  bindSort($('stab'), sst, renderStocks);
 }
 
 
@@ -299,10 +321,13 @@ function renderRS() {
     const I = eqIndex(D.groups[g]); const rs = t => I[t] / M[t];
     return { g, n: D.groups[g].length, cells: cols.map(t => { const k = WE.indexOf(t); return rs(t) / rs(WE[k - 4]) - 1; }) };
   }).sort((a, b) => b.cells.at(-1) - a.cells.at(-1));
+  const st = SORT.rs;
+  const sorted = sortBy(rows, r => st.k === 'name' ? r.g : st.k === 'last' ? r.cells.at(-1) : r.cells[+st.k], st);
   const bg = v => { const a = Math.min(1, Math.abs(v) / 0.3); return v >= 0 ? `rgba(192,57,43,${.12 + a * .88})` : `rgba(30,127,79,${.12 + a * .88})`; };
-  $('rs').innerHTML = `<thead><tr><th>族群</th>${cols.map(t => `<th style="text-align:center">${md(t)}</th>`).join('')}</tr></thead><tbody>` +
-    rows.map(r => `<tr data-g="${esc(r.g)}"><td>${esc(r.g)} <span class="mut">(${r.n})</span></td>${r.cells.map(v => `<td style="text-align:center;background:${bg(v)};color:${Math.abs(v) > .18 ? '#fff' : 'inherit'}">${(v * 100).toFixed(0)}</td>`).join('')}</tr>`).join('') + '</tbody>';
+  $('rs').innerHTML = `<thead><tr>${TH(st, 'name', '族群')}${cols.map((t, i) => TH(st, i, md(t), 'text-align:center')).join('')}</tr></thead><tbody>` +
+    sorted.map(r => `<tr data-g="${esc(r.g)}"><td>${esc(r.g)} <span class="mut">(${r.n})</span></td>${r.cells.map(v => `<td style="text-align:center;background:${bg(v)};color:${Math.abs(v) > .18 ? '#fff' : 'inherit'}">${(v * 100).toFixed(0)}</td>`).join('')}</tr>`).join('') + '</tbody>';
   $('rs').querySelectorAll('tbody tr').forEach(tr => tr.onclick = () => pickGroup(tr.dataset.g, true));
+  bindSort($('rs'), st, renderRS);
 }
 
 function pickGroup(g, scroll) {
